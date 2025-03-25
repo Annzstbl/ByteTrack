@@ -98,7 +98,7 @@ def make_parser():
     ## bytetrack
     parser.add_argument("--track_thresh", type=float, default=0.6, help="tracking confidence threshold")
     parser.add_argument("--track_buffer", type=int, default=30, help="the frames for keep lost tracks")
-    parser.add_argument("--match_thresh", type=float, default=0.1, help="matching threshold for tracking")
+    parser.add_argument("--match_thresh", type=float, default=0.9, help="matching threshold for tracking")
     parser.add_argument("--min-box-area", type=float, default=0, help='filter out tiny boxes') 
     # parser.add_argument("--mot20", dest="mot20", default=False, action="store_true", help="test mot20.")
 
@@ -113,6 +113,9 @@ def make_parser():
     parser.add_argument("--det_root", type=str, help="path to detections")
 
     parser.add_argument("--workdir", type=str, help="workdir relative path to det_root")
+    parser.add_argument("--vid_white_list", type=str, default=None, help="video white list")
+
+
 
     return parser
 
@@ -228,14 +231,24 @@ if __name__ == '__main__':
     det_root = args.det_root
 
     workdir = os.path.join(args.workdir, args.tracker, args.experiment_name)
-    os.makedirs(workdir, exist_ok=True)
+    track_dir = os.path.join(workdir, 'track')
+    os.makedirs(track_dir, exist_ok=True)
 
     tracker = args.tracker
 
+    if args.vid_white_list is not None:
+        vid_white_list = args.vid_white_list.split(",")
+    else:
+        vid_white_list = []
+
     for vid in os.listdir(img_root):
+        if len(vid_white_list) > 0 and not any([v in vid for v in vid_white_list]):
+            print(f'VID_WHITE_LIST logging: skip {vid}')
+            continue
+
         img_path = os.path.join(img_root, vid)
         det_path = os.path.join(det_root, vid)
-        result_txt = os.path.join(workdir, vid + ".txt")
+        result_txt = os.path.join(track_dir, vid + ".txt")
 
         if tracker == 'bytetrack':
             track_one_video(args, img_path, det_path, result_txt, vid)

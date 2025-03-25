@@ -75,6 +75,8 @@ class STrack(BaseTrack):
         if new_id:
             self.track_id = self.next_id()
         self.score = new_track.score
+        self.cls = new_track.cls
+        self.xyxyxyxy = new_track.xyxyxyxy
 
     def update(self, new_track, frame_id):
         """
@@ -87,9 +89,9 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
 
-        xyxyxyxy = new_track.xyxyxyxy
+        self.xyxyxyxy = new_track.xyxyxyxy
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.xyxyxyxy_to_xyaha(xyxyxyxy))
+            self.mean, self.covariance, self.xyxyxyxy_to_xyaha(self.xyxyxyxy))
         self.state = TrackState.Tracked
         self.is_activated = True
 

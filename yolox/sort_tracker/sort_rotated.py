@@ -54,6 +54,9 @@ def linear_assignment(cost_matrix):
 
 
 def convert_bbox_to_z(bbox):
+  '''
+    from xyxyxyxy to [x, y, theta, area, w/h/ratio]
+  '''
   ret = poly2obb_np_woscore(bbox[:8])
   x = ret[0]
   y = ret[1]
@@ -76,7 +79,9 @@ def convert_bbox_to_z(bbox):
 
 
 def convert_x_to_bbox(x,score=None):
-
+  '''
+    from [x, y, theta, area, w/h/ratio] to xyxyxyxy
+  '''
   w = np.sqrt(x[3] * x[4])
   h = x[3] / w
 
@@ -127,6 +132,7 @@ class KalmanBoxTracker(object):
     self.age = 0
     self.cls = cls
     self.score = score
+    self.xyxyxyxy = bbox
 
   def update(self,bbox, cls, score):
     """
@@ -141,6 +147,7 @@ class KalmanBoxTracker(object):
     # 更新
     self.cls = cls
     self.score = score
+    self.xyxyxyxy = bbox
 
   def predict(self):
     """
@@ -168,6 +175,9 @@ class KalmanBoxTracker(object):
   def get_score(self):
     return self.score
 
+  def get_xyxyxyxy_from_detection(self):
+    return self.xyxyxyxy
+
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   """
@@ -178,13 +188,11 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
     return np.empty((0,2),dtype=int), np.arange(len(detections)), np.empty((0,5),dtype=int)
 
   # iou_matrix = iou_batch(detections, trackers)
-  iou_matrix = 1-poly_iou(detections, trackers)
+  iou_matrix = poly_iou(detections, trackers)#! 这里是计算iou, 不是计算cost
   a_cls = detections[:, 8].reshape(-1)
   b_cls = trackers[:, 8].reshape(-1)
   cls_matrix = a_cls[:, None] != b_cls[None, :]
-  cls_matrix = cls_matrix.astype(np.float32)
-
-  iou_matrix = iou_matrix + 0.5 * cls_matrix
+  cls_matrix = cls_matrix.astype(np.float32) #! 这里是cost
 
 
   if min(iou_matrix.shape) > 0:
@@ -192,7 +200,8 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
     if a.sum(1).max() == 1 and a.sum(0).max() == 1:
         matched_indices = np.stack(np.where(a), axis=1)
     else:
-      matched_indices = linear_assignment(-iou_matrix)
+      all_matrx = (1-iou_matrix) + cls_matrix
+      matched_indices = linear_assignment(all_matrx)
   else:
     matched_indices = np.empty(shape=(0,2))
 
@@ -280,7 +289,8 @@ class Sort(object):
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
-        d = trk.get_state()[0]
+        # d = trk.get_state()[0]
+        d = trk.get_xyxyxyxy_from_detection()
         cls = trk.get_cls()
         score = trk.get_score()
         if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
