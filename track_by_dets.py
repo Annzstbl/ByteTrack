@@ -4,7 +4,6 @@ import argparse
 import os
 import numpy as np
 from mmcv.ops import box_iou_rotated
-from mmrotate.core.bbox.transforms import obb2poly, poly2obb
 from tqdm import tqdm
 
 
@@ -104,17 +103,16 @@ def make_parser():
     # parser.add_argument("--mot20", dest="mot20", default=False, action="store_true", help="test mot20.")
 
     ## sort
-    #   def __init__(self, det_thresh, max_age=30, min_hits=3, iou_threshold=0.3):
-    parser.add_argument("--det_thresh", type=float, default=0.6)
+    parser.add_argument("--det_thresh", type=float, default=0.4)
     parser.add_argument("--max_age", type=int, default=30)
     parser.add_argument("--min_hits", type=int, default=3)
-    parser.add_argument("--iou_threshold", type=float, default=0.1)
+    parser.add_argument("--iou_threshold", type=float, default=0.3)
 
     # file path
-    parser.add_argument("--img_root", type=str, default="/data3/PublicDataset/Custom/HSMOT/test/rgb/", help="path to images")
-    parser.add_argument("--det_root", type=str, default="/data3/litianhao/workdir/hsmot/yolo11/predict/hsmot_rgb_v11lobb_pretrainedweight_202412302_test/", help="path to detections")
-    parser.add_argument("--workdir_prefix", type=str, default="../../sort/", help="workdir relative path to det_root")
-    parser.add_argument("--exp_name", type=str, default="iou0.1", help="experiment name")
+    parser.add_argument("--img_root", type=str, help="path to images")
+    parser.add_argument("--det_root", type=str, help="path to detections")
+
+    parser.add_argument("--workdir", type=str, help="workdir relative path to det_root")
 
     return parser
 
@@ -124,6 +122,7 @@ IMG_SIZE = [900, 1200]
 def load_imgs_and_dets(img_path, det_path):
     '''
         返回图片列表和检测结果列表
+        保证image_list 和 dets_list的长度一致
         检测结果格式：[[x1, y1, x2, y2, x3, y3, x4, y4, cls, score], ...]
     '''
     # Load images
@@ -186,7 +185,6 @@ def track_one_video(args, img_path, det_path, result_txt, vid_name):
             track_id = targets.track_id
             txt.append(result2str(frame, track_id, xyxyxyxy, score, cls))
     
-    print("Save results to", result_txt)
     with open(result_txt, "w") as f:
         f.write("\n".join(txt))
     print("Results saved to ", result_txt)
@@ -217,7 +215,6 @@ def track_one_video_sort(args, img_path, det_path, result_txt, vid_name):
             track_id = targets[10]
             txt.append(result2str(frame, track_id, xyxyxyxy, score, cls))
     
-    print("Save results to", result_txt)
     with open(result_txt, "w") as f:
         f.write("\n".join(txt))
     print("Results saved to ", result_txt)
@@ -230,7 +227,7 @@ if __name__ == '__main__':
     img_root = args.img_root
     det_root = args.det_root
 
-    workdir = os.path.join(args.det_root, args.workdir_prefix, args.exp_name, 'track')
+    workdir = os.path.join(args.workdir, args.tracker, args.experiment_name)
     os.makedirs(workdir, exist_ok=True)
 
     tracker = args.tracker

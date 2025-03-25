@@ -94,10 +94,10 @@ class KalmanFilter(object):
         Parameters
         ----------
         mean : ndarray
-            The 9 dimensional mean vector of the object state at the previous
+            The 10 dimensional mean vector of the object state at the previous
             time step.
         covariance : ndarray
-            The 9x9 dimensional covariance matrix of the object state at the
+            The 10x10 dimensional covariance matrix of the object state at the
             previous time step.
 
         Returns
@@ -134,9 +134,9 @@ class KalmanFilter(object):
         Parameters
         ----------
         mean : ndarray
-            The state's mean vector (9 dimensional array).
+            The state's mean vector (10 dimensional array).
         covariance : ndarray
-            The state's covariance matrix (9x9 dimensional).
+            The state's covariance matrix (10x10 dimensional).
 
         Returns
         -------
@@ -205,9 +205,9 @@ class KalmanFilter(object):
         Parameters
         ----------
         mean : ndarray
-            The predicted state's mean vector (9 dimensional).
+            The predicted state's mean vector (10 dimensional).
         covariance : ndarray
-            The state's covariance matrix (9x9 dimensional).
+            The state's covariance matrix (10x10 dimensional).
         measurement : ndarray
             The 4 dimensional measurement vector (x, y, a, h, angle), where (x, y)
             is the center position, a the aspect ratio, and h the height, angle of the

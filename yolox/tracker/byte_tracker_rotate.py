@@ -13,9 +13,6 @@ from .basetrack import BaseTrack, TrackState
 from hsmot.util.bbox import poly2obb_np_woscore, obb2poly_np_woscore
 from mmcv.ops import box_iou_rotated
 
-from torch import tensor
-
-
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
     def __init__(self, xyxyxyxy, score, cls):
@@ -25,7 +22,7 @@ class STrack(BaseTrack):
         '''
 
         # wait activate
-        self.xyxyxyxy = np.asarray(xyxyxyxy, dtype=np.float)
+        self.xyxyxyxy = np.asarray(xyxyxyxy, dtype=float)
         self.kalman_filter = None
         self.mean, self.covariance = None, None
         self.is_activated = False
