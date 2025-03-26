@@ -1,6 +1,7 @@
 from yolox.tracker.byte_tracker_rotate import BYTETracker
 from yolox.sort_tracker.sort_rotated import Sort
 from trackers.ocsort_tracker.ocsort_rotate import OCSort
+from trackers.bot_sort_tracker.bot_sort_rotate import BoTSORT
 import argparse
 import os
 import numpy as np
@@ -95,6 +96,9 @@ def make_parser():
 
 
     parser.add_argument("--tracker", type=str, help="bytetrack, sort")
+    # ocsort
+    parser.add_argument("--use_byte", default=False, action="store_true")
+    parser.add_argument('--oc_track_thresh', type=float, default=0.6)
 
     ## bytetrack
     parser.add_argument("--track_thresh", type=float, default=0.6, help="tracking confidence threshold")
@@ -116,9 +120,21 @@ def make_parser():
     parser.add_argument("--workdir", type=str, help="workdir relative path to det_root")
     parser.add_argument("--vid_white_list", type=str, default=None, help="video white list")
 
+    # botsrot
+    parser.add_argument("--bot_track_high_thresh", type=float, default=0.6, help="tracking confidence threshold")
+    parser.add_argument("--bot_track_low_thresh", default=0.1, type=float, help="lowest detection threshold valid for tracks")
+    parser.add_argument("--bot_new_track_thresh", default=0.7, type=float, help="new track thresh")
+    parser.add_argument("--bot_track_buffer", type=int, default=30, help="the frames for keep lost tracks")
+    parser.add_argument("--bot_match_thresh", type=float, default=0.8, help="matching threshold for tracking")
+    parser.add_argument("--bot_with_reid", default=False, action="store_true", help="use reid for tracking")
+    parser.add_argument("--bot_cmc_method", default="sparseOptFlow", type=str, help="method for cmc")
+    parser.add_argument("--bot_name", default = None, type=str, help="seq name")
+    parser.add_argument("--bot_ablation", default = None, type=str, help="seq name")
+
 
 
     return parser
+
 
 INFO_IMGS = [900, 1200]
 IMG_SIZE = [900, 1200]
@@ -162,7 +178,7 @@ def result2str(frame, track_id, xyxyxyxy, score, cls):
     return ret.replace(" ", ",")
 
 
-def track_one_video(args, img_path, det_path, result_txt, vid_name):
+def track_one_video_bytetrack(args, img_path, det_path, result_txt, vid_name):
 
     BYTETracker._count = 0
     
@@ -226,7 +242,7 @@ def track_one_video_sort(args, img_path, det_path, result_txt, vid_name):
 def track_one_video_oc_sort(args, img_path, det_path, result_txt, vid_name):
 
     # Load tracker
-    tracker = OCSort(args.det_thresh, args.max_age, args.min_hits, args.iou_threshold)
+    tracker = OCSort(args.oc_track_thresh, args.max_age, args.min_hits, args.iou_threshold, use_byte=args.use_byte)
 
     # Load images and detections
     image_list, dets_list = load_imgs_and_dets(img_path, det_path)
@@ -246,6 +262,49 @@ def track_one_video_oc_sort(args, img_path, det_path, result_txt, vid_name):
             cls = targets[8]
             score = targets[9]
             track_id = targets[10]
+            txt.append(result2str(frame, track_id, xyxyxyxy, score, cls))
+    
+    with open(result_txt, "w") as f:
+        f.write("\n".join(txt))
+    print("Results saved to ", result_txt)
+
+def track_one_video_bot_sort(args, img_path, det_path, result_txt, vid_name):
+
+    # Load images and detections
+    image_list, dets_list = load_imgs_and_dets(img_path, det_path)
+
+    # find keys in args which start with bot_, and construct a new args
+    args_bot = {}
+    for key in args.__dict__:
+        if key.startswith("bot_"):
+            args_bot[key[4:]] = args.__dict__[key]
+    # turn to namespace
+    args_bot = argparse.Namespace(**args_bot)
+
+
+    # Load tracker
+    tracker = BoTSORT(args_bot)
+
+    txt = []
+    # Track
+    for index, dets in enumerate(tqdm(dets_list, desc=vid_name)):
+
+        img = np.load(os.path.join(img_path, image_list[index])) #shape [H, W, 8]
+        img = img[:,:, [1, 2, 4]]
+        img = np.ascontiguousarray(img)
+
+        dets_np = np.array(dets)
+        if len(dets_np) == 0:
+            dets_np = np.zeros((0, 10))
+
+        online_targets = tracker.update(dets_np, img)
+        # print(online_targets)
+        for targets in online_targets:
+            xyxyxyxy = targets.xyxyxyxy
+            frame = index +1# 从1开始
+            score = targets.score
+            cls = targets.cls
+            track_id = targets.track_id
             txt.append(result2str(frame, track_id, xyxyxyxy, score, cls))
     
     with open(result_txt, "w") as f:
@@ -280,11 +339,13 @@ if __name__ == '__main__':
         result_txt = os.path.join(track_dir, vid + ".txt")
 
         if tracker == 'bytetrack':
-            track_one_video(args, img_path, det_path, result_txt, vid)
+            track_one_video_bytetrack(args, img_path, det_path, result_txt, vid)
         elif tracker == 'sort':
             track_one_video_sort(args, img_path, det_path, result_txt, vid)
         elif tracker == 'ocsort':
             track_one_video_oc_sort(args, img_path, det_path, result_txt, vid)
+        elif tracker == 'botsort':
+            track_one_video_bot_sort(args, img_path, det_path, result_txt, vid)
         else:
             raise NotImplementedError(f"Tracker {tracker} not implemented.")
 
