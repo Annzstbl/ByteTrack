@@ -1,5 +1,6 @@
 from yolox.tracker.byte_tracker_rotate import BYTETracker
 from yolox.sort_tracker.sort_rotated import Sort
+from trackers.ocsort_tracker.ocsort_rotate import OCSort
 import argparse
 import os
 import numpy as np
@@ -222,6 +223,34 @@ def track_one_video_sort(args, img_path, det_path, result_txt, vid_name):
         f.write("\n".join(txt))
     print("Results saved to ", result_txt)
 
+def track_one_video_oc_sort(args, img_path, det_path, result_txt, vid_name):
+
+    # Load tracker
+    tracker = OCSort(args.det_thresh, args.max_age, args.min_hits, args.iou_threshold)
+
+    # Load images and detections
+    image_list, dets_list = load_imgs_and_dets(img_path, det_path)
+
+    txt = []
+    # Track
+    for index, dets in enumerate(tqdm(dets_list, desc=vid_name)):
+        dets_np = np.array(dets)
+        if len(dets_np) == 0:
+            dets_np = np.zeros((0, 10))
+
+        online_targets = tracker.update(dets_np, INFO_IMGS, IMG_SIZE)
+        # print(online_targets)
+        for targets in online_targets:
+            xyxyxyxy = targets[:8]
+            frame = index+1
+            cls = targets[8]
+            score = targets[9]
+            track_id = targets[10]
+            txt.append(result2str(frame, track_id, xyxyxyxy, score, cls))
+    
+    with open(result_txt, "w") as f:
+        f.write("\n".join(txt))
+    print("Results saved to ", result_txt)
 
 if __name__ == '__main__':
     parser = make_parser()
@@ -234,7 +263,7 @@ if __name__ == '__main__':
     track_dir = os.path.join(workdir, 'track')
     os.makedirs(track_dir, exist_ok=True)
 
-    tracker = args.tracker
+    tracker = args.tracker.lower()
 
     if args.vid_white_list is not None:
         vid_white_list = args.vid_white_list.split(",")
@@ -254,6 +283,8 @@ if __name__ == '__main__':
             track_one_video(args, img_path, det_path, result_txt, vid)
         elif tracker == 'sort':
             track_one_video_sort(args, img_path, det_path, result_txt, vid)
+        elif tracker == 'ocsort':
+            track_one_video_oc_sort(args, img_path, det_path, result_txt, vid)
         else:
             raise NotImplementedError(f"Tracker {tracker} not implemented.")
 
